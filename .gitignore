@@ -1,0 +1,10 @@
+#Ignore binary files
+server/server
+client/client
+
+#Object directories
+server/obj
+client/obj
+
+#Temp files
+*~
