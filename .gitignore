@@ -1,6 +1,8 @@
 #Ignore binary files
 server/server
 client/client
+udp_example/client_udp
+udp_example/server_udp
 
 #Object directories
 server/obj
