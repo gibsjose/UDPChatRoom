@@ -2,9 +2,11 @@
 
 #include <sys/socket.h> //Socket features
 #include <netinet/in.h> //Internet-specific features of sockets
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>   //timeval structure
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
 
@@ -56,6 +58,7 @@ int main(int argc, char *argv[]) {
 
     char s_line[1024];
     char r_line[1024];
+    memset(&r_line, 0, 1024);
     fgets(s_line, 1024, stdin);
 
     //sendto: Like 'send()': Sends the data over the socket, except does not require
