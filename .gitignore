@@ -10,3 +10,6 @@ client/obj
 
 #Temp files
 *~
+
+#Clang bullshit
+*.dSYM
