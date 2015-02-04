@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     //Create server/client address structures:
-    // Server needs to know both the address of itself and the client
+    //Server needs to know both the address of itself and the client
     struct sockaddr_in serveraddr;
     struct sockaddr_in clientaddr;
 
