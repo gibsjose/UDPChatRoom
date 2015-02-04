@@ -56,6 +56,7 @@ int main(int argc, char *argv[]) {
 
     char s_line[1024];
     char r_line[1024];
+    fflush(stdin);
     fgets(s_line, 1024, stdin);
 
     //sendto: Like 'send()': Sends the data over the socket, except does not require

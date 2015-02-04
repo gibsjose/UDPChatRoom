@@ -34,6 +34,8 @@ int main(int argc, char *argv[]) {
         //Receive on the client socket
         char r_line[1024];
 
+        memset(r_line, 0, 1024);
+
         unsigned int n = recvfrom(sockfd, r_line, 5000, 0, (struct sockaddr *)&clientaddr, &len);
 
         //Display data received
