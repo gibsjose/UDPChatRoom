@@ -11,8 +11,11 @@
 #include <iostream>
 
 #define MAX_INPUT_SIZE (1024)
+#define ACK_CHAR 6
+#define STX_CHAR 2
+#define ETX_CHAR 3
 
-int send_get_ack(char * aBytes, size_t aLen, int aSocketFD, struct sockaddr * aDestAddr, socklen_t aDestAddrLen);
+bool send_get_ack(char * aBytes, size_t aLen, int aSocketFD, struct sockaddr * aDestAddr, socklen_t aDestAddrLen);
 //Trim the first newline character from the string
 void ntrim(char *str);
 
@@ -28,6 +31,19 @@ int main(int argc, char *argv[]) {
     //  SOCK_DGRAM says we want UDP as our transport layer
     //  0 is a parameter used for some options for certain types of sockets, unused for INET sockets
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    //Create timeval struct
+    struct timeval to;
+    to.tv_sec = 5;
+    to.tv_usec = 0;
+
+    //Make socket only wait for 5 seconds w/ setsockopt
+    //  socket descriptor
+    //  socket level (internet sockets, local sockets, etc.)
+    //  option we want (SO_RCVTIMEO = Receive timeout)
+    //  timeout structure
+    //  size of structure
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 
     if(sockfd < 0) {
         printf("Could not open socket\n");
@@ -61,19 +77,17 @@ int main(int argc, char *argv[]) {
     serveraddr.sin_addr.s_addr = inet_addr(address);        //Specify the IP address of the server with which to communicate
 
     //"Connect" to the server by sending it 'STX' and expect an 'ACK' back.
-    char lSTX = 2;//'STX'
+    char lSTX = STX_CHAR;
     if(!send_get_ack(&lSTX, 1, sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr))) {
         printf("Could not connect to server\n");
-        perror(strerror(errno));
         return -1;
     }
 
     //Add server socket and stdin to file desciptor set
     FD_SET(sockfd, &sockets);
-    FD_SET(0, &sockets);    //Add stdin to fd set
+    FD_SET(STDIN_FILENO, &sockets);    //Add stdin to fd set
 
     std::cout << "Chat room client" << std::endl;
-    std::string lTextToSend;
 
     char * response = (char*)malloc(MAX_INPUT_SIZE);
 
@@ -92,69 +106,67 @@ int main(int argc, char *argv[]) {
       //  RET: Number of descriptors available in the set
       select(FD_SETSIZE, &tmp_set, NULL, NULL, NULL);
 
-      //Iterate over the set
-      for (int i = 0; i < FD_SETSIZE; i++) {
-          //If the set is member of the temp set
-          if(FD_ISSET(i, &tmp_set)) {
+      //If the socket is a member of the temp set, there is stuff to read from the socket.
+      if(FD_ISSET(sockfd, &tmp_set)) {
+        unsigned int len = sizeof(serveraddr);
+        int n = recvfrom(
+          sockfd,
+          response,
+          MAX_INPUT_SIZE,
+          0,
+          (struct sockaddr *)&serveraddr,
+          &len
+        );
 
-              // If socket is the server connection, read the data
-              if(i == sockfd) {
-                  unsigned int len = sizeof(serveraddr);
-                  int n = recvfrom(
-                    sockfd,
-                    response,
-                    MAX_INPUT_SIZE,
-                    0,
-                    (struct sockaddr *)&serveraddr,
-                    &len
-                  );
+        if(n <= 0) {
+            //Server has potentially closed the connection (check for specific error value)
+            printf("Error reading data from server\n");
+            close(sockfd);
+            free(response);
+            return -1;
+        }
+        ntrim(response);
+        printf("%s\n", response);
+        memset(response, 0, MAX_INPUT_SIZE);
+      }
+      else if(FD_ISSET(STDIN_FILENO, &tmp_set))
+      {
+        //There is something to read from stdin, so read it and send it to the server.
+        char r_line[MAX_INPUT_SIZE];
+        read(STDIN_FILENO, r_line, MAX_INPUT_SIZE);
+        ntrim(r_line);
 
-                  //Error
-                  if(n <= 0) {
-                      //Server has potentially closed the connection (check for specific error value)
-                      printf("Error reading data from server\n");
-                      return -1;
-                  }
-                  ntrim(response);
-                  printf("%s\n", response);
-                  memset(response, 0, MAX_INPUT_SIZE);
-
-              }
-              else {
-                  char r_line[MAX_INPUT_SIZE];
-                  read(i, r_line, MAX_INPUT_SIZE);
-                  //Send the data over the socket:
-                  //  socket descriptor
-                  //  data (const void *)
-                  //  size of the data
-                  //  optional settings
-                  ntrim(r_line);
-
-                  send_get_ack(r_line, strlen(r_line), sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-
-                  // Quit the program if /quit input
-                  if(!strcmp(r_line, "/exit"))
-                  {
-                    //to disconnect, send the ETX character and expect an ACK back from the server
-                    char lETX = 3;//'ETX'
-                    if(!send_get_ack(&lETX, 1, sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)))
-                    {
-                      //did not get an ACK back, so the server must be down
-                      std::cerr << "Server unreachable on disconnect.\n";
-                      free(response);
-                      close(sockfd);
-                      return -1;
-                    }
-                    else
-                    {
-                      std::cout << "Recieved an ACK from server; cleanly shutting down." << std::endl;
-                      free(response);
-                      close(sockfd);
-                      return 0;
-                    }
-                  }
-              }
+        // Quit the program if /exit was typed.
+        if(!strcmp(r_line, "/exit"))
+        {
+          //to disconnect, send the ETX character and expect an ACK back from the server
+          char lETX = ETX_CHAR;
+          if(send_get_ack(&lETX, 1, sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)))
+          {
+            std::cout << "Recieved an ACK from server; cleanly shutting down." << std::endl;
+            free(response);
+            close(sockfd);
+            return 0;
           }
+          else
+          {
+            //did not get an ACK back, so the server must be down
+            std::cerr << "Server unreachable on disconnect.\n";
+            free(response);
+            close(sockfd);
+            return -1;
+          }
+        }
+        else
+        {
+          if(!send_get_ack(r_line, strlen(r_line), sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)))
+          {
+            std::cerr << "Server did not ACK packet--assuming it is down.\n";
+            free(response);
+            close(sockfd);
+            return -1;
+          }
+        }
       }
     }
     close(sockfd);
@@ -171,7 +183,7 @@ void ntrim(char *str) {
     }
 }
 
-int send_get_ack(
+bool send_get_ack(
   char * aBytes,
   size_t aLen,
   int aSocketFD,
@@ -179,23 +191,49 @@ int send_get_ack(
   socklen_t aDestAddrLen)
 {
   //With UDP, whatever is in the send buffer is explicitly sent in a packet
-  int lReturn = sendto(
-    aSocketFD,
-    aBytes,
-    aLen,
-    0,
-    aDestAddr,
-    aDestAddrLen
-  );
+  if(-1 == sendto(
+                  aSocketFD,
+                  aBytes,
+                  aLen,
+                  0,
+                  aDestAddr,
+                  aDestAddrLen
+                  )
+    )
+  {
+    perror(strerror(errno));
+    return false;
+  }
+
+  char * lResponse = (char *)malloc(MAX_INPUT_SIZE);
 
   int n = recvfrom(
     aSocketFD,
-    response,
+    lResponse,
     MAX_INPUT_SIZE,
     0,
     (struct sockaddr *)&aDestAddrLen,
-    &len
+    &aDestAddrLen
   );
 
-  return lReturn;
+  if(n < 0)
+  {
+    perror(strerror(errno));
+    free(lResponse);
+    return false;
+  }
+  //Check if ACK char.
+  else if(lResponse[0] == ACK_CHAR)
+  {
+    free(lResponse);
+    return true;
+  }
+  else
+  {
+    free(lResponse);
+    return false;
+  }
+
+  //satisfy the compiler--this should never be executed.
+  return false;
 }
