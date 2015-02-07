@@ -50,10 +50,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    fd_set sockets;
-    // Clear the fd set
-    FD_ZERO(&sockets);
-
     //Prompt user for server address and port
     printf("Server address: ");
     fgets(address, 64, stdin);
@@ -82,6 +78,10 @@ int main(int argc, char *argv[]) {
         printf("Could not connect to server\n");
         return -1;
     }
+
+    fd_set sockets;
+    // Clear the fd set
+    FD_ZERO(&sockets);
 
     //Add server socket and stdin to file desciptor set
     FD_SET(sockfd, &sockets);
@@ -162,11 +162,15 @@ int main(int argc, char *argv[]) {
           if(!send_get_ack(r_line, strlen(r_line), sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)))
           {
             std::cerr << "Server did not ACK packet--assuming it is down.\n";
-            free(response);
+            /*free(response);
             close(sockfd);
-            return -1;
+            return -1;*/
           }
         }
+      }
+      else
+      {
+        std::cout << "No file descriptor ready for reading..." << std::endl;
       }
     }
     close(sockfd);
@@ -222,14 +226,14 @@ bool send_get_ack(
     free(lResponse);
     return false;
   }
-  //Check if ACK char.
-  else if(lResponse[0] == ACK_CHAR)
+  else if(lResponse[0] == ACK_CHAR) //Check if ACK char.
   {
     free(lResponse);
     return true;
   }
   else
   {
+    std::cout << "DEBUG: Raw response (should be just the ACK char): " << std::string(lResponse) << std::endl;
     free(lResponse);
     return false;
   }
