@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
         printf("No bytes were received from server...\n");
     } else {
         printf("Received %d bytes from server: %s\n", n, r_line);
+        printf("The line said %d", r_line[0]);
     }
 
     //Close the socket
