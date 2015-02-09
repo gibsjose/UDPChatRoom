@@ -1,15 +1,27 @@
-//Example client application
+/*
+ * This is a simple chat client program that communicates with a server over UDP.
+ *
+ * The client "connects" with the server by sending a STX byte and expecting the
+ * server to send back an ACK byte.  Conversely, it "disconnects" by sending a
+ * ETX byte and expecting the server to send back an ACK byte.  Each message that
+ * is entered by the user and is sent to the server is expected to be ACKed too.
+ *
+ * Date submitted:  11 February 2015
+ *
+ * Team:
+ *  - Adam Luckenbaugh
+ *  - Raleigh Mumford
+ *  - Seth Hilaski
+ *  - Joe Gibson
+ */
 
 #include "../defines.hpp"
 
 #include <sys/socket.h> //Socket features
 #include <netinet/in.h> //Internet-specific features of sockets
 #include <arpa/inet.h>  //inet_addr()
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <libgen.h>
 #include <iostream>
 
 bool send_get_ack(char * aBytes, size_t aLen, int aSocketFD, struct sockaddr * aDestAddr, socklen_t aDestAddrLen);
@@ -43,23 +55,23 @@ int main(int argc, char *argv[]) {
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
 
     if(sockfd < 0) {
-        printf("Could not open socket\n");
+        std::cerr << "Could not open socket\n";
         return -1;
     }
 
     //Prompt user for server address and port
-    printf("Server address: ");
+    std::cout << "Server address: " << std::flush;
     fgets(address, 64, stdin);
     ntrim(address);
 
-    printf("Server port: ");
+    std::cout << "Server port: " << std::flush;
     fgets(port_str, 16, stdin);
     ntrim(port_str);
     port = atoi(port_str);
 
-    printf("===========================================\n");
-    printf("Connecting to %s:%d\n", address, port);
-    printf("===========================================\n\n");
+    std::cout << "===========================================\n";
+    std::cout << "Connecting to %s:%d\n" << address << port;
+    std::cout << "===========================================\n" << std::endl;
 
     //inet_addr() converts a string-address into the proper type
     //Specify the address for the socket
@@ -72,7 +84,7 @@ int main(int argc, char *argv[]) {
     //"Connect" to the server by sending it 'STX' and expect an 'ACK' back.
     char lSTX = STX_CHAR;
     if(!send_get_ack(&lSTX, 1, sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr))) {
-        printf("Could not connect to server\n");
+        std::cerr << "Could not connect to server\n";
         return -1;
     }
 
@@ -82,7 +94,7 @@ int main(int argc, char *argv[]) {
 
     //Add server socket and stdin to file desciptor set
     FD_SET(sockfd, &sockets);
-    FD_SET(STDIN_FILENO, &sockets);    //Add stdin to fd set
+    FD_SET(STDIN_FILENO, &sockets);
 
     std::cout << "Chat room client" << std::endl;
 
@@ -117,13 +129,13 @@ int main(int argc, char *argv[]) {
 
         if(n <= 0) {
             //Server has potentially closed the connection (check for specific error value)
-            printf("Error reading data from server\n");
+            std::cerr << "Error reading data from server\n";
             close(sockfd);
             free(response);
             return -1;
         }
         ntrim(response);
-        printf("%s\n", response);
+        std::cout << response << std::endl;
         memset(response, 0, MAX_INPUT_SIZE);
       }
       else if(FD_ISSET(STDIN_FILENO, &tmp_set))
@@ -159,9 +171,9 @@ int main(int argc, char *argv[]) {
           if(!send_get_ack(r_line, strlen(r_line), sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)))
           {
             std::cerr << "Server did not ACK packet--assuming it is down.\n";
-            /*free(response);
+            free(response);
             close(sockfd);
-            return -1;*/
+            return -1;
           }
         }
       }
@@ -184,6 +196,9 @@ void ntrim(char *str) {
     }
 }
 
+/*
+ * Send bytes and attempt to receive an ACK response.
+ */
 bool send_get_ack(
   char * aBytes,
   size_t aLen,
@@ -206,6 +221,7 @@ bool send_get_ack(
     return false;
   }
 
+  // Attempt to receive an ACK response.
   char * lResponse = (char *)malloc(MAX_INPUT_SIZE);
 
   int n = recvfrom(
@@ -223,7 +239,7 @@ bool send_get_ack(
     free(lResponse);
     return false;
   }
-  else if(lResponse[0] == ACK_CHAR) //Check if ACK char.
+  else if(lResponse[0] == ACK_CHAR) //Check if this is an ACK response.
   {
     free(lResponse);
     return true;
@@ -234,7 +250,4 @@ bool send_get_ack(
     free(lResponse);
     return false;
   }
-
-  //satisfy the compiler--this should never be executed.
-  return false;
 }
