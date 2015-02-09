@@ -1,5 +1,7 @@
 //Example client application
 
+#include "../defines.hpp"
+
 #include <sys/socket.h> //Socket features
 #include <netinet/in.h> //Internet-specific features of sockets
 #include <arpa/inet.h>  //inet_addr()
@@ -9,11 +11,6 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <iostream>
-
-#define MAX_INPUT_SIZE (1024)
-#define ACK_CHAR 6
-#define STX_CHAR 2
-#define ETX_CHAR 3
 
 bool send_get_ack(char * aBytes, size_t aLen, int aSocketFD, struct sockaddr * aDestAddr, socklen_t aDestAddrLen);
 //Trim the first newline character from the string
