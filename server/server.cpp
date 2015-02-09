@@ -12,7 +12,8 @@
 #include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
-#include <unordered_map>
+#include <iostream>
+#include <map>
 
 
 #define PORT 8888   //Default server port
@@ -21,7 +22,7 @@
 void getAddressAndPort(struct sockaddr_in *s, char *addr, size_t addr_size, uint16_t *port);
 
 int main(int argc, char *argv[]) {
-    std::unordered_map<char *,sockaddr_in> map;
+    std::map<std::pair<unsigned short int, char * >,sockaddr_in> map;
 
     //Used for ack to the client
     char ack = 6;
@@ -46,7 +47,7 @@ int main(int argc, char *argv[]) {
     //Handle connections
     while(1) {
       unsigned int len = sizeof(clientaddr);
-      
+
       //Receive on the client socket
       char r_line[1024];
       memset(&r_line, 0, 1024);
@@ -56,44 +57,46 @@ int main(int argc, char *argv[]) {
       unsigned int n = recvfrom(sockfd, r_line, 5000, 0, (struct sockaddr *)&clientaddr, &len);
 
       //Check to see if the message recieved is the ascii STX and send back
-      printf("Received %d bytes from client: %s\n", n, r_line);
-
+      //printf("Received %d bytes from client: %s\n", n, r_line);
 
       if(r_line[0] == 2) {
         sendto(sockfd, &ack, 1, 0, (struct sockaddr *)&clientaddr, sizeof(clientaddr));
+        //sendto(sockfd, r_line, strlen(r_line), 0, (struct sockaddr *)&clientaddr, sizeof(clientaddr));
         //Need to convert this to standard IP
-        //inet_ntoa
         char * ip;
         ip = inet_ntoa(clientaddr.sin_addr);
-        map.insert(std::pair<char *, sockaddr_in>(ip, clientaddr));
+
+        map[std::pair<unsigned short int, char *>(clientaddr.sin_port, ip)] = clientaddr;
+        //map.insert(std::pair<std::pair<unsigned short int, char *>, sockaddr_in>(new std::pair<unsigned short int, char *>(clientaddr.sin_port, ip), clientaddr);
+
         printf("<---> New client connected (%s)\n\n", ip);
       }
-      //Checking for ascii ETX to finish connection
       else if(r_line[0] == 3) {
-        sendto(sockfd, &ack, 1, 0, (struct sockaddr *)&clientaddr, sizeof(clientaddr));
+        //Checking for ascii ETX to finish connection
         char * ip;
         ip = inet_ntoa(clientaddr.sin_addr);
-        map.erase(ip);
-        printf("Sent ack");
+        map.erase(std::pair<unsigned short int, char *>(clientaddr.sin_port, ip));
+        sendto(sockfd, &ack, 1, 0, (struct sockaddr *)&clientaddr, sizeof(clientaddr));
+        printf("Sent ack to confirm shut down from %s", ip);
+        std::cout << std::endl;
       }
       else {
+        sendto(sockfd, &ack, 1, 0, (struct sockaddr *)&clientaddr, sizeof(clientaddr));
         //Display data received
         printf("Received %d bytes from client: %s\n", n, r_line);
 
         for(auto a = map.begin(); a != map.end(); ++a) {
-          sendto(sockfd, r_line, strlen(r_line), 0, (struct sockaddr *)&a, sizeof(a));
+          if(a->first.first == clientaddr.sin_port) {
+
+          }
+          //printf("Going through loops");
+          else {
+            sendto(sockfd, r_line, strlen(r_line), 0, (struct sockaddr *)&a->second, sizeof(a->second));
+          }
         }
-
-        //Echo data back to client
-
-
-        //No need to close UDP socket since there is only one for all clients
       }
-      for(auto a = map.begin(); a != map.end(); ++a) {
-        sendto(sockfd, r_line, strlen(r_line), 0, (struct sockaddr *)&a, sizeof(a));
-        char * ip;
-        ip = inet_ntoa(a->second.sin_addr);
-        printf("%s", ip);
+      for(auto a = map.begin(); a!= map.end(); ++a) {
+        //printf("These are the ports in the map %hu", a->first);
       }
     }
 }
