@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     port = atoi(port_str);
 
     std::cout << "===========================================\n";
-    std::cout << "Connecting to %s:%d\n" << address << port;
+    std::cout << "Connecting to " << address << ":" << port <<std::endl;
     std::cout << "===========================================\n" << std::endl;
 
     //inet_addr() converts a string-address into the proper type
