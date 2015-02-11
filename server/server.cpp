@@ -18,7 +18,6 @@
 
 
 #define PORT 8888   //Default server port
-#define LEN 1024    //Arbitrary string length
 
 void getAddressAndPort(struct sockaddr_in *s, char *addr, size_t addr_size, uint16_t *port);
 
@@ -34,7 +33,7 @@ int main(int argc, char *argv[]) {
   struct sockaddr_in serveraddr;
   struct sockaddr_in clientaddr;
   serveraddr.sin_family = AF_INET;
-  serveraddr.sin_port = htons(9876);
+  serveraddr.sin_port = htons(PORT);
   serveraddr.sin_addr.s_addr = INADDR_ANY;    //Specifies the address on which the server will listen to for clients...
                                               //INADDR_ANY specifies to listen on ANY address, but with a fixed port
 
